@@ -88,6 +88,7 @@ describe("headhunter conflict resolution", function()
         vim.api.nvim_set_current_buf(file_buf)
         vim.api.nvim_win_set_cursor(0, { 1, 0 })
 
+        -- Explicitly set auto_write = true to test behavior when enabled, regardless of default.
         headhunter.setup({ auto_write = true, keys = false })
         headhunter.take_head()
 
