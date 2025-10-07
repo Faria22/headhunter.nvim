@@ -37,6 +37,7 @@ Customize inline with lazy.nvim if you need different bindings:
   config = function()
     require("headhunter").setup({
       enabled = true,         -- set to false to opt out entirely
+      auto_write = true,      -- write after resolving so navigation never errors
       keys = {
         next = "]c",         -- remap `]g` → `]c`
         prev = "[c",          -- remap `[g` → `[c`
@@ -49,6 +50,16 @@ Customize inline with lazy.nvim if you need different bindings:
 ```
 
 ---
+
+## ⚙️ Configuration
+
+`require("headhunter").setup()` accepts the following options:
+
+| Option | Type | Default | Description |
+| ------ | ---- | ------- | ----------- |
+| `enabled` | boolean | `true` | Skip all setup work (keymaps and commands) when `false`. |
+| `keys` | table / false | defaults shown below | Override or disable individual keymaps. |
+| `auto_write` | boolean | `true` | Automatically `:write` after resolving a conflict. When `false`, Headhunter warns and blocks navigation until you save manually. |
 
 ### Default Keymaps
 
@@ -110,6 +121,7 @@ _Notes:_
 - Take HEAD keeps only your local changes.
 - Take origin keeps only the incoming changes from the other branch.
 - Take both concatenates your changes with the incoming changes, in that order.
+- With `auto_write = true` (default) the buffer saves immediately after each resolution so you can keep jumping; disable it if you prefer to review before writing.
 
 ---
 
@@ -120,3 +132,18 @@ We use plenary.nvim
 ```sh
 make test
 ```
+
+---
+
+## 🔬 Demo Repository
+
+Need a safe place to try things out? A miniature merge sandbox lives in `demo/conflict_lab`.
+
+```sh
+cd demo/conflict_lab
+./setup.sh       # creates demo/conflict_lab/repo with conflicts in two files
+cd repo
+nvim app.lua     # load the repo however you prefer
+```
+
+The generated merge pauses with conflicts in both `app.lua` and `service.lua`, making it easy to verify `auto_write` on/off, resolution commands, and conflict navigation. Run `git reset --hard` inside the repo—or rerun `./setup.sh`—whenever you need a fresh set of conflicts.

@@ -3,6 +3,8 @@ describe("headhunter.nvim", function()
     local headhunter
     local keymap_set
     local command_create
+    local notify_stub
+    local cmd_stub
 
     local function load_plugin()
         package.loaded["headhunter"] = nil
@@ -13,11 +15,21 @@ describe("headhunter.nvim", function()
         load_plugin()
         keymap_set = stub(vim.keymap, "set")
         command_create = stub(vim.api, "nvim_create_user_command")
+        notify_stub = nil
+        cmd_stub = nil
     end)
 
     after_each(function()
         keymap_set:revert()
         command_create:revert()
+        if notify_stub then
+            notify_stub:revert()
+            notify_stub = nil
+        end
+        if cmd_stub then
+            cmd_stub:revert()
+            cmd_stub = nil
+        end
         package.loaded["headhunter"] = nil
     end)
 
@@ -107,6 +119,17 @@ describe("headhunter.nvim", function()
         headhunter.setup() -- reset state for later tests
     end)
 
+    it("rejects non-boolean auto_write", function()
+        local ok, err = pcall(function()
+            headhunter.setup({ auto_write = "yes" })
+        end)
+
+        assert.is_false(ok)
+        assert.matches("auto_write", err)
+
+        headhunter.setup()
+    end)
+
     it("returns empty table when no conflicts", function()
         local conflicts = headhunter._get_conflicts_mock("")
         assert.are.same({}, conflicts)
@@ -151,5 +174,43 @@ file1.txt:7:>>>>>>> Stashed changes
         assert.are.equal(1, #conflicts)
         assert.are.equal("file1.txt", conflicts[1].file)
         assert.are.equal(3, conflicts[1].lnum)
+    end)
+
+    it("requires manual write when auto_write disabled", function()
+        local tmpfile = vim.fn.tempname()
+        local bufnr = vim.api.nvim_create_buf(true, false)
+        vim.api.nvim_buf_set_option(bufnr, "swapfile", false)
+        vim.api.nvim_buf_set_name(bufnr, tmpfile)
+        vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, {
+            "<<<<<<< HEAD",
+            "ours",
+            "=======",
+            "theirs",
+            ">>>>>>> branch",
+        })
+
+        notify_stub = stub(vim, "notify")
+        cmd_stub = stub(vim, "cmd")
+
+        headhunter.setup({ auto_write = false, keys = false })
+
+        local original_get_conflicts = headhunter._get_conflicts
+        headhunter._get_conflicts = function()
+            error("navigate_conflict should exit before fetching conflicts")
+        end
+
+        vim.api.nvim_set_current_buf(bufnr)
+        vim.api.nvim_win_set_cursor(0, { 1, 0 })
+        headhunter.take_head()
+        headhunter.next_conflict()
+
+        assert.stub(notify_stub).was_called()
+        local message = notify_stub.calls[1].vals[1]
+        assert.matches("write the buffer before jumping", message)
+        assert.are.equal(0, #cmd_stub.calls)
+
+        headhunter._get_conflicts = original_get_conflicts
+        vim.api.nvim_buf_delete(bufnr, { force = true })
+        vim.loop.fs_unlink(tmpfile)
     end)
 end)

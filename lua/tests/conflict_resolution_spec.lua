@@ -71,4 +71,30 @@ describe("headhunter conflict resolution", function()
         local lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
         assert.are.same({ "upstream change" }, lines)
     end)
+
+    it("writes resolved buffer to disk when auto_write enabled", function()
+        local tmpfile = vim.fn.tempname()
+        local file_buf = vim.api.nvim_create_buf(true, false)
+        vim.api.nvim_buf_set_option(file_buf, "swapfile", false)
+        vim.api.nvim_buf_set_name(file_buf, tmpfile)
+        vim.api.nvim_buf_set_lines(file_buf, 0, -1, false, {
+            "<<<<<<< HEAD",
+            "my change",
+            "=======",
+            "their change",
+            ">>>>>>> branch",
+        })
+
+        vim.api.nvim_set_current_buf(file_buf)
+        vim.api.nvim_win_set_cursor(0, { 1, 0 })
+
+        headhunter.take_head()
+
+        vim.api.nvim_buf_delete(file_buf, { force = true })
+        local saved = vim.fn.readfile(tmpfile)
+        assert.are.same({ "my change" }, saved)
+
+        vim.loop.fs_unlink(tmpfile)
+        vim.api.nvim_set_current_buf(bufnr)
+    end)
 end)

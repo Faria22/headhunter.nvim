@@ -29,7 +29,18 @@ end
 local defaultConfig = {
     enabled = true,
     keys = vim.deepcopy(default_keys),
+    auto_write = true,
 }
+
+local config = vim.deepcopy(defaultConfig)
+
+local function notify(msg, level)
+    if vim.notify then
+        vim.notify(msg, level or vim.log.levels.INFO)
+    else
+        print(msg)
+    end
+end
 
 -- Parses git grep output (testable, can be called by tests)
 function M._parse_conflicts(output)
@@ -112,6 +123,17 @@ end
 
 -- Jump to next conflict
 local function navigate_conflict(direction)
+    if config.auto_write == false then
+        local current_buf = vim.api.nvim_get_current_buf()
+        if vim.bo[current_buf].modified then
+            notify(
+                "headhunter.nvim: write the buffer before jumping to another conflict",
+                vim.log.levels.WARN
+            )
+            return
+        end
+    end
+
     conflicts = M._get_conflicts()
 
     if #conflicts == 0 then
@@ -207,6 +229,21 @@ local function apply_resolution(mode)
         false,
         replacement
     )
+
+    if config.auto_write then
+        local ok, err = pcall(function()
+            vim.api.nvim_buf_call(bufnr, function()
+                vim.cmd("silent! write")
+            end)
+        end)
+
+        if not ok then
+            notify(
+                string.format("headhunter.nvim: failed to write buffer: %s", err),
+                vim.log.levels.WARN
+            )
+        end
+    end
 end
 
 function M.take_head()
@@ -243,8 +280,6 @@ function M._register_keymaps(config)
     map(keys.quickfix, M.populate_quickfix, "List Git conflicts")
 end
 
-local config = vim.deepcopy(defaultConfig)
-
 function M.setup(user_config)
     local opts = vim.deepcopy(user_config or {})
     if opts.keys ~= nil and opts.keys ~= false then
@@ -273,6 +308,10 @@ function M.setup(user_config)
                 )
             end
         end
+    end
+
+    if opts.auto_write ~= nil and type(opts.auto_write) ~= "boolean" then
+        error("headhunter.nvim: `auto_write` expects a boolean value")
     end
 
     config = vim.tbl_deep_extend("force", vim.deepcopy(defaultConfig), opts)
