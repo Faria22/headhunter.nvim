@@ -123,17 +123,6 @@ end
 
 -- Jump to next conflict
 local function navigate_conflict(direction)
-    if config.auto_write == false then
-        local current_buf = vim.api.nvim_get_current_buf()
-        if vim.bo[current_buf].modified then
-            notify(
-                "headhunter.nvim: write the buffer before jumping to another conflict",
-                vim.log.levels.WARN
-            )
-            return
-        end
-    end
-
     conflicts = M._get_conflicts()
 
     if #conflicts == 0 then

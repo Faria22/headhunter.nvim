@@ -176,44 +176,6 @@ file1.txt:7:>>>>>>> Stashed changes
         assert.are.equal(3, conflicts[1].lnum)
     end)
 
-    it("requires manual write when auto_write disabled", function()
-        local tmpfile = vim.fn.tempname()
-        local bufnr = vim.api.nvim_create_buf(true, false)
-        vim.api.nvim_buf_set_option(bufnr, "swapfile", false)
-        vim.api.nvim_buf_set_name(bufnr, tmpfile)
-        vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, {
-            "<<<<<<< HEAD",
-            "ours",
-            "=======",
-            "theirs",
-            ">>>>>>> branch",
-        })
-
-        notify_stub = stub(vim, "notify")
-        cmd_stub = stub(vim, "cmd")
-
-        headhunter.setup({ auto_write = false, keys = false })
-
-        local original_get_conflicts = headhunter._get_conflicts
-        headhunter._get_conflicts = function()
-            error("navigate_conflict should exit before fetching conflicts")
-        end
-
-        vim.api.nvim_set_current_buf(bufnr)
-        vim.api.nvim_win_set_cursor(0, { 1, 0 })
-        headhunter.take_head()
-        headhunter.next_conflict()
-
-        assert.stub(notify_stub).was_called()
-        local message = notify_stub.calls[1].vals[1]
-        assert.matches("write the buffer before jumping", message)
-        assert.are.equal(0, #cmd_stub.calls)
-
-        headhunter._get_conflicts = original_get_conflicts
-        vim.api.nvim_buf_delete(bufnr, { force = true })
-        vim.loop.fs_unlink(tmpfile)
-    end)
-
     describe("strict no-hidden navigation", function()
         it("temporarily enables hidden during navigation", function()
             local tmpfile1 = vim.fn.tempname()
