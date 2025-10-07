@@ -138,7 +138,6 @@ local function navigate_conflict(direction)
     end
 
     local conflict = conflicts[current_index]
-    
     if config.auto_write then
         -- When auto_write is enabled, files are saved after resolution
         -- so we can use regular edit command
