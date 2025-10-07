@@ -149,8 +149,25 @@ local function navigate_conflict(direction)
     end
 
     local conflict = conflicts[current_index]
-    vim.cmd("edit " .. conflict.file)
-    vim.api.nvim_win_set_cursor(0, { conflict.lnum, 0 })
+    
+    -- Temporarily enable hidden to allow navigation across modified buffers
+    local original_hidden = vim.o.hidden
+    vim.o.hidden = true
+    
+    local ok, err = pcall(function()
+        vim.cmd("edit " .. conflict.file)
+        vim.api.nvim_win_set_cursor(0, { conflict.lnum, 0 })
+    end)
+    
+    -- Restore original hidden setting
+    vim.o.hidden = original_hidden
+    
+    if not ok then
+        notify(
+            string.format("headhunter.nvim: failed to navigate to conflict: %s", err),
+            vim.log.levels.WARN
+        )
+    end
 end
 
 function M.populate_quickfix()
