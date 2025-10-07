@@ -123,17 +123,6 @@ end
 
 -- Jump to next conflict
 local function navigate_conflict(direction)
-    if config.auto_write == false then
-        local current_buf = vim.api.nvim_get_current_buf()
-        if vim.bo[current_buf].modified then
-            notify(
-                "headhunter.nvim: write the buffer before jumping to another conflict",
-                vim.log.levels.WARN
-            )
-            return
-        end
-    end
-
     conflicts = M._get_conflicts()
 
     if #conflicts == 0 then
@@ -149,7 +138,17 @@ local function navigate_conflict(direction)
     end
 
     local conflict = conflicts[current_index]
-    vim.cmd("edit " .. conflict.file)
+    if config.auto_write then
+        -- When auto_write is enabled, files are saved after resolution
+        -- so we can use regular edit command
+        vim.cmd("edit " .. conflict.file)
+    else
+        -- When auto_write is disabled, use bufadd/bufload to avoid E37 errors
+        -- This allows navigation across modified buffers without saving
+        local bufnr = vim.fn.bufadd(conflict.file)
+        vim.fn.bufload(bufnr)
+        vim.api.nvim_set_current_buf(bufnr)
+    end
     vim.api.nvim_win_set_cursor(0, { conflict.lnum, 0 })
 end
 
@@ -239,7 +238,10 @@ local function apply_resolution(mode)
 
         if not ok then
             notify(
-                string.format("headhunter.nvim: failed to write buffer: %s", err),
+                string.format(
+                    "headhunter.nvim: failed to write buffer: %s",
+                    err
+                ),
                 vim.log.levels.WARN
             )
         end
@@ -317,7 +319,8 @@ function M.setup(user_config)
     config = vim.tbl_deep_extend("force", vim.deepcopy(defaultConfig), opts)
 
     if config.keys ~= false then
-        config.keys = vim.tbl_extend("force", {}, default_keys, config.keys or {})
+        config.keys =
+            vim.tbl_extend("force", {}, default_keys, config.keys or {})
     end
 
     if config.enabled == false then

@@ -176,41 +176,102 @@ file1.txt:7:>>>>>>> Stashed changes
         assert.are.equal(3, conflicts[1].lnum)
     end)
 
-    it("requires manual write when auto_write disabled", function()
-        local tmpfile = vim.fn.tempname()
-        local bufnr = vim.api.nvim_create_buf(true, false)
-        vim.api.nvim_buf_set_option(bufnr, "swapfile", false)
-        vim.api.nvim_buf_set_name(bufnr, tmpfile)
-        vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, {
-            "<<<<<<< HEAD",
-            "ours",
-            "=======",
-            "theirs",
-            ">>>>>>> branch",
-        })
+    describe("navigation across modified buffers", function()
+        it("allows navigation from modified buffer without save", function()
+            local tmpfile1 = vim.fn.tempname()
+            local tmpfile2 = vim.fn.tempname()
 
-        notify_stub = stub(vim, "notify")
-        cmd_stub = stub(vim, "cmd")
+            -- Create first file with conflict
+            vim.fn.writefile({
+                "<<<<<<< HEAD",
+                "first",
+                "=======",
+                "other",
+                ">>>>>>> branch",
+            }, tmpfile1)
 
-        headhunter.setup({ auto_write = false, keys = false })
+            -- Create second file with conflict
+            vim.fn.writefile({
+                "<<<<<<< HEAD",
+                "second",
+                "=======",
+                "other",
+                ">>>>>>> branch",
+            }, tmpfile2)
 
-        local original_get_conflicts = headhunter._get_conflicts
-        headhunter._get_conflicts = function()
-            error("navigate_conflict should exit before fetching conflicts")
-        end
+            -- Mock get_conflicts to return our test files
+            local original_get_conflicts = headhunter._get_conflicts
+            headhunter._get_conflicts = function()
+                return {
+                    { file = tmpfile1, lnum = 1 },
+                    { file = tmpfile2, lnum = 1 },
+                }
+            end
 
-        vim.api.nvim_set_current_buf(bufnr)
-        vim.api.nvim_win_set_cursor(0, { 1, 0 })
-        headhunter.take_head()
-        headhunter.next_conflict()
+            -- Open first file and modify it
+            local bufnr1 = vim.fn.bufadd(tmpfile1)
+            vim.fn.bufload(bufnr1)
+            vim.api.nvim_set_current_buf(bufnr1)
+            vim.api.nvim_buf_set_lines(
+                bufnr1,
+                0,
+                -1,
+                false,
+                { "modified content" }
+            )
 
-        assert.stub(notify_stub).was_called()
-        local message = notify_stub.calls[1].vals[1]
-        assert.matches("write the buffer before jumping", message)
-        assert.are.equal(0, #cmd_stub.calls)
+            -- Navigate to next conflict - should succeed even with modified buffer
+            headhunter.setup({ keys = false })
+            headhunter.next_conflict()
 
-        headhunter._get_conflicts = original_get_conflicts
-        vim.api.nvim_buf_delete(bufnr, { force = true })
-        vim.loop.fs_unlink(tmpfile)
+            -- Verify we navigated to the second file
+            local current_buf = vim.api.nvim_get_current_buf()
+            local current_name = vim.api.nvim_buf_get_name(current_buf)
+            assert.are.equal(tmpfile2, current_name)
+
+            -- Clean up
+            headhunter._get_conflicts = original_get_conflicts
+            vim.api.nvim_buf_delete(bufnr1, { force = true })
+            if vim.api.nvim_buf_is_valid(current_buf) then
+                vim.api.nvim_buf_delete(current_buf, { force = true })
+            end
+            vim.loop.fs_unlink(tmpfile1)
+            vim.loop.fs_unlink(tmpfile2)
+        end)
+
+        it("works regardless of hidden setting", function()
+            local tmpfile1 = vim.fn.tempname()
+            local tmpfile2 = vim.fn.tempname()
+
+            vim.fn.writefile({ "line1" }, tmpfile1)
+            vim.fn.writefile({ "line2" }, tmpfile2)
+
+            local original_get_conflicts = headhunter._get_conflicts
+            headhunter._get_conflicts = function()
+                return {
+                    { file = tmpfile1, lnum = 1 },
+                    { file = tmpfile2, lnum = 1 },
+                }
+            end
+
+            -- Test with hidden=false (strict mode)
+            vim.o.hidden = false
+
+            headhunter.setup({ keys = false })
+            headhunter.next_conflict()
+
+            -- Verify navigation succeeded
+            local current_buf = vim.api.nvim_get_current_buf()
+            local current_name = vim.api.nvim_buf_get_name(current_buf)
+            assert.are.equal(tmpfile2, current_name)
+
+            -- Clean up
+            headhunter._get_conflicts = original_get_conflicts
+            if vim.api.nvim_buf_is_valid(current_buf) then
+                vim.api.nvim_buf_delete(current_buf, { force = true })
+            end
+            vim.loop.fs_unlink(tmpfile1)
+            vim.loop.fs_unlink(tmpfile2)
+        end)
     end)
 end)
