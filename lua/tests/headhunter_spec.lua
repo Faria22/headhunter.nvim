@@ -212,7 +212,13 @@ file1.txt:7:>>>>>>> Stashed changes
             local bufnr1 = vim.fn.bufadd(tmpfile1)
             vim.fn.bufload(bufnr1)
             vim.api.nvim_set_current_buf(bufnr1)
-            vim.api.nvim_buf_set_lines(bufnr1, 0, -1, false, { "modified content" })
+            vim.api.nvim_buf_set_lines(
+                bufnr1,
+                0,
+                -1,
+                false,
+                { "modified content" }
+            )
 
             -- Navigate to next conflict - should succeed even with modified buffer
             headhunter.setup({ keys = false })
