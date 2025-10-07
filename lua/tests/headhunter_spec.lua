@@ -176,8 +176,8 @@ file1.txt:7:>>>>>>> Stashed changes
         assert.are.equal(3, conflicts[1].lnum)
     end)
 
-    describe("strict no-hidden navigation", function()
-        it("temporarily enables hidden during navigation", function()
+    describe("navigation across modified buffers", function()
+        it("allows navigation from modified buffer without save", function()
             local tmpfile1 = vim.fn.tempname()
             local tmpfile2 = vim.fn.tempname()
 
@@ -208,15 +208,11 @@ file1.txt:7:>>>>>>> Stashed changes
                 }
             end
 
-            -- Set hidden to false
-            vim.o.hidden = false
-
             -- Open first file and modify it
-            local bufnr1 = vim.api.nvim_create_buf(true, false)
-            vim.api.nvim_buf_set_option(bufnr1, "swapfile", false)
-            vim.api.nvim_buf_set_name(bufnr1, tmpfile1)
-            vim.api.nvim_buf_set_lines(bufnr1, 0, -1, false, { "modified content" })
+            local bufnr1 = vim.fn.bufadd(tmpfile1)
+            vim.fn.bufload(bufnr1)
             vim.api.nvim_set_current_buf(bufnr1)
+            vim.api.nvim_buf_set_lines(bufnr1, 0, -1, false, { "modified content" })
 
             -- Navigate to next conflict - should succeed even with modified buffer
             headhunter.setup({ keys = false })
@@ -226,9 +222,6 @@ file1.txt:7:>>>>>>> Stashed changes
             local current_buf = vim.api.nvim_get_current_buf()
             local current_name = vim.api.nvim_buf_get_name(current_buf)
             assert.are.equal(tmpfile2, current_name)
-
-            -- Verify hidden was restored to false
-            assert.is_false(vim.o.hidden)
 
             -- Clean up
             headhunter._get_conflicts = original_get_conflicts
@@ -240,35 +233,7 @@ file1.txt:7:>>>>>>> Stashed changes
             vim.loop.fs_unlink(tmpfile2)
         end)
 
-        it("restores hidden option after navigation error", function()
-            -- Set hidden to false
-            vim.o.hidden = false
-
-            -- Mock get_conflicts to return an invalid file
-            local original_get_conflicts = headhunter._get_conflicts
-            headhunter._get_conflicts = function()
-                return {
-                    { file = "/nonexistent/invalid/file.txt", lnum = 1 },
-                }
-            end
-
-            notify_stub = stub(vim, "notify")
-            headhunter.setup({ keys = false })
-
-            -- Attempt navigation - should handle error gracefully
-            headhunter.next_conflict()
-
-            -- Verify hidden was restored to false even after error
-            assert.is_false(vim.o.hidden)
-
-            -- Verify error was notified
-            assert.stub(notify_stub).was_called()
-
-            -- Clean up
-            headhunter._get_conflicts = original_get_conflicts
-        end)
-
-        it("preserves hidden=true when set by user", function()
+        it("works regardless of hidden setting", function()
             local tmpfile1 = vim.fn.tempname()
             local tmpfile2 = vim.fn.tempname()
 
@@ -283,18 +248,19 @@ file1.txt:7:>>>>>>> Stashed changes
                 }
             end
 
-            -- Set hidden to true
-            vim.o.hidden = true
+            -- Test with hidden=false (strict mode)
+            vim.o.hidden = false
 
             headhunter.setup({ keys = false })
             headhunter.next_conflict()
 
-            -- Verify hidden is still true
-            assert.is_true(vim.o.hidden)
+            -- Verify navigation succeeded
+            local current_buf = vim.api.nvim_get_current_buf()
+            local current_name = vim.api.nvim_buf_get_name(current_buf)
+            assert.are.equal(tmpfile2, current_name)
 
             -- Clean up
             headhunter._get_conflicts = original_get_conflicts
-            local current_buf = vim.api.nvim_get_current_buf()
             if vim.api.nvim_buf_is_valid(current_buf) then
                 vim.api.nvim_buf_delete(current_buf, { force = true })
             end

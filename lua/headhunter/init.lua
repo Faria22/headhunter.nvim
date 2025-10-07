@@ -139,24 +139,12 @@ local function navigate_conflict(direction)
 
     local conflict = conflicts[current_index]
     
-    -- Temporarily enable hidden to allow navigation across modified buffers
-    local original_hidden = vim.o.hidden
-    vim.o.hidden = true
-    
-    local ok, err = pcall(function()
-        vim.cmd("edit " .. conflict.file)
-        vim.api.nvim_win_set_cursor(0, { conflict.lnum, 0 })
-    end)
-    
-    -- Restore original hidden setting
-    vim.o.hidden = original_hidden
-    
-    if not ok then
-        notify(
-            string.format("headhunter.nvim: failed to navigate to conflict: %s", err),
-            vim.log.levels.WARN
-        )
-    end
+    -- Use bufadd and nvim_set_current_buf to avoid E37 errors
+    -- This approach doesn't trigger the "No write since last change" error
+    local bufnr = vim.fn.bufadd(conflict.file)
+    vim.fn.bufload(bufnr)
+    vim.api.nvim_set_current_buf(bufnr)
+    vim.api.nvim_win_set_cursor(0, { conflict.lnum, 0 })
 end
 
 function M.populate_quickfix()
