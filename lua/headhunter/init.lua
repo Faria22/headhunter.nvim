@@ -29,7 +29,7 @@ end
 local defaultConfig = {
     enabled = true,
     keys = vim.deepcopy(default_keys),
-    auto_write = false,
+    auto_write = true,
 }
 
 local config = vim.deepcopy(defaultConfig)
@@ -139,12 +139,19 @@ local function navigate_conflict(direction)
 
     local conflict = conflicts[current_index]
     
-    -- Use bufadd and nvim_set_current_buf to avoid E37 errors
-    -- This approach doesn't trigger the "No write since last change" error
-    local bufnr = vim.fn.bufadd(conflict.file)
-    vim.fn.bufload(bufnr)
-    vim.api.nvim_set_current_buf(bufnr)
-    vim.api.nvim_win_set_cursor(0, { conflict.lnum, 0 })
+    if config.auto_write then
+        -- When auto_write is enabled, files are saved after resolution
+        -- so we can use regular edit command
+        vim.cmd("edit " .. conflict.file)
+        vim.api.nvim_win_set_cursor(0, { conflict.lnum, 0 })
+    else
+        -- When auto_write is disabled, use bufadd/bufload to avoid E37 errors
+        -- This allows navigation across modified buffers without saving
+        local bufnr = vim.fn.bufadd(conflict.file)
+        vim.fn.bufload(bufnr)
+        vim.api.nvim_set_current_buf(bufnr)
+        vim.api.nvim_win_set_cursor(0, { conflict.lnum, 0 })
+    end
 end
 
 function M.populate_quickfix()
