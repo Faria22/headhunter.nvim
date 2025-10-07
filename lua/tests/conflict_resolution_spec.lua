@@ -88,6 +88,7 @@ describe("headhunter conflict resolution", function()
         vim.api.nvim_set_current_buf(file_buf)
         vim.api.nvim_win_set_cursor(0, { 1, 0 })
 
+        headhunter.setup({ auto_write = true, keys = false })
         headhunter.take_head()
 
         vim.api.nvim_buf_delete(file_buf, { force = true })

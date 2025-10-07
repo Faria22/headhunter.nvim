@@ -29,7 +29,7 @@ end
 local defaultConfig = {
     enabled = true,
     keys = vim.deepcopy(default_keys),
-    auto_write = true,
+    auto_write = false,
 }
 
 local config = vim.deepcopy(defaultConfig)
