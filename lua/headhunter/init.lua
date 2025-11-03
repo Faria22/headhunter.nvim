@@ -213,7 +213,7 @@ local function apply_resolution(mode)
 
     if config.auto_save then
         vim.api.nvim_buf_call(bufnr, function()
-            vim.cmd("silent noautocmd write")
+            vim.cmd("silent write")
         end)
     end
 end
