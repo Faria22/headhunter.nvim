@@ -79,24 +79,9 @@ function M._get_conflicts()
     return conflicts_list
 end
 
-local function build_quickfix_entries(conflicts_list)
-    local entries = {}
-    for _, conflict in ipairs(conflicts_list) do
-        local bufnr = vim.fn.bufadd(conflict.file)
-        table.insert(entries, {
-            bufnr = bufnr,
-            filename = vim.fn.fnamemodify(conflict.file, ":."),
-            lnum = conflict.lnum,
-            col = 1,
-            text = "Merge conflict marker",
-        })
-    end
-    return entries
-end
-
 -- Jump to next conflict
 local function navigate_conflict(direction)
-    conflicts = M._get_conflicts()
+    conflicts = get_conflicts()
 
     if #conflicts == 0 then
         print("No conflicts found ✅")
@@ -113,19 +98,6 @@ local function navigate_conflict(direction)
     local conflict = conflicts[current_index]
     vim.cmd("edit " .. conflict.file)
     vim.api.nvim_win_set_cursor(0, { conflict.lnum, 0 })
-end
-
-function M.populate_quickfix()
-    local conflicts_list = M._get_conflicts()
-    if #conflicts_list == 0 then
-        vim.fn.setqflist({}, "r")
-        print("No conflicts found ✅")
-        return
-    end
-
-    local entries = build_quickfix_entries(conflicts_list)
-    vim.fn.setqflist(entries, "r")
-    vim.cmd("copen")
 end
 
 -- Jump to next conflict
@@ -280,12 +252,6 @@ function M.setup(user_config)
         "HeadhunterTakeBoth",
         M.take_both,
         { desc = "Take both changes" }
-    )
-
-    vim.api.nvim_create_user_command(
-        "HeadhunterQuickfix",
-        M.populate_quickfix,
-        { desc = "List Git conflicts in quickfix" }
     )
 
     vim.api.nvim_create_user_command("HeadhunterReload", function()
