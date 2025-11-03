@@ -37,6 +37,7 @@ Customize inline with lazy.nvim if you need different bindings:
   config = function()
     require("headhunter").setup({
       enabled = true,         -- set to false to opt out entirely
+      auto_save = false,      -- default; set true to auto-write after resolving
       keys = {
         next = "]c",         -- remap `]g` → `]c`
         prev = "[c",          -- remap `[g` → `[c`
@@ -47,6 +48,9 @@ Customize inline with lazy.nvim if you need different bindings:
   end,
 }
 ```
+
+Enable `auto_save = true` to have headhunter.nvim silently write the buffer
+after applying a resolution. The default is `false`.
 
 ---
 
