@@ -11,6 +11,7 @@ A Neovim plugin that helps you quickly **navigate and resolve merge conflicts** 
   - **Take HEAD** (`<<<<<<< HEAD`) – keeps your local changes.
   - **Take origin** (`>>>>>>> ...`) – keeps the incoming changes.
   - **Take both** – keeps both changes, concatenated in order.
+- Keep the quickfix list in sync while you resolve conflicts, and close it automatically when you're done.
 - Minimal and fast — pure Lua implementation with no external dependencies.
 - Fully customizable keybindings to fit your workflow.
 

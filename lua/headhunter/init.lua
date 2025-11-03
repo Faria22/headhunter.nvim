@@ -2,6 +2,8 @@ local M = {}
 
 local conflicts = {}
 local current_index = 0
+local quickfix_active = false
+local NO_CONFLICTS_MESSAGE = "No conflicts found ✅"
 
 local default_keys = {
     prev = "[g",
@@ -110,16 +112,57 @@ local function build_quickfix_entries(conflicts_list)
     return entries
 end
 
--- Jump to next conflict
-local function navigate_conflict(direction)
+local function close_quickfix_window()
+    pcall(vim.cmd, "cclose")
+end
+
+local function refresh_conflicts(opts)
+    opts = opts or {}
+
+    local previous_count = #conflicts
     conflicts = M._get_conflicts()
 
+    if quickfix_active then
+        if #conflicts == 0 then
+            vim.fn.setqflist({}, "r")
+            close_quickfix_window()
+            quickfix_active = false
+            print(NO_CONFLICTS_MESSAGE)
+        else
+            local entries = build_quickfix_entries(conflicts)
+            vim.fn.setqflist(entries, "r")
+        end
+    end
+
+    if
+        opts.after_resolution
+        and previous_count > #conflicts
+        and current_index > 0
+    then
+        current_index = current_index - 1
+    end
+
     if #conflicts == 0 then
-        print("No conflicts found ✅")
+        current_index = 0
+    elseif current_index > #conflicts then
+        current_index = #conflicts
+    elseif current_index < 0 then
+        current_index = 0
+    end
+
+    return conflicts
+end
+
+-- Jump to next conflict
+local function navigate_conflict(direction)
+    refresh_conflicts()
+
+    if #conflicts == 0 then
+        print(NO_CONFLICTS_MESSAGE)
         return
     end
 
-    current_index = current_index + direction * 1
+    current_index = current_index + direction
     if current_index > #conflicts then
         current_index = 1
     elseif current_index < 1 then
@@ -132,15 +175,21 @@ local function navigate_conflict(direction)
 end
 
 function M.populate_quickfix()
-    local conflicts_list = M._get_conflicts()
+    local was_quickfix_active = quickfix_active
+    local conflicts_list = refresh_conflicts()
     if #conflicts_list == 0 then
-        vim.fn.setqflist({}, "r")
-        print("No conflicts found ✅")
+        quickfix_active = false
+        if not was_quickfix_active then
+            vim.fn.setqflist({}, "r")
+            close_quickfix_window()
+            print(NO_CONFLICTS_MESSAGE)
+        end
         return
     end
 
     local entries = build_quickfix_entries(conflicts_list)
     vim.fn.setqflist(entries, "r")
+    quickfix_active = true
     vim.cmd("copen")
 end
 
@@ -207,6 +256,8 @@ local function apply_resolution(mode)
         false,
         replacement
     )
+
+    refresh_conflicts({ after_resolution = true })
 end
 
 function M.take_head()
@@ -282,6 +333,10 @@ function M.setup(user_config)
     end
 
     if config.enabled == false then
+        return
+    end
+
+    if config.keys == false then
         return
     end
 

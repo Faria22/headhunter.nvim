@@ -6,11 +6,13 @@ describe("headhunter quickfix integration", function()
     before_each(function()
         original_get_conflicts = headhunter._get_conflicts
         vim.fn.setqflist({})
+        pcall(vim.cmd, "cclose")
     end)
 
     after_each(function()
         headhunter._get_conflicts = original_get_conflicts
         vim.fn.setqflist({})
+        pcall(vim.cmd, "cclose")
     end)
 
     it("populates quickfix with conflicts", function()
@@ -47,5 +49,63 @@ describe("headhunter quickfix integration", function()
 
         local items = vim.fn.getqflist()
         assert.are.equal(0, #items)
+    end)
+
+    it("keeps quickfix entries updated after refresh", function()
+        local file = vim.fn.fnamemodify("lua/headhunter/init.lua", ":p")
+        local conflicts = {
+            { file = file, lnum = 12 },
+            { file = file, lnum = 42 },
+        }
+        headhunter._get_conflicts = function()
+            return vim.deepcopy(conflicts)
+        end
+
+        headhunter.populate_quickfix()
+        assert.are.equal(2, #vim.fn.getqflist())
+
+        conflicts = {
+            { file = file, lnum = 42 },
+        }
+
+        headhunter.populate_quickfix()
+
+        local items = vim.fn.getqflist()
+        assert.are.equal(1, #items)
+        assert.are.equal(42, items[1].lnum)
+    end)
+
+    it("clears quickfix automatically after resolving conflicts", function()
+        local file = vim.fn.tempname() .. ".txt"
+        local conflicts = {
+            { file = file, lnum = 1 },
+        }
+        headhunter._get_conflicts = function()
+            return vim.deepcopy(conflicts)
+        end
+
+        headhunter.populate_quickfix()
+        assert.are.equal(1, #vim.fn.getqflist())
+
+        conflicts = {}
+
+        local bufnr = vim.api.nvim_create_buf(false, true)
+        vim.api.nvim_buf_set_name(bufnr, file)
+        vim.api.nvim_set_current_buf(bufnr)
+        vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, {
+            "<<<<<<< HEAD",
+            "my change",
+            "=======",
+            "their change",
+            ">>>>>>> branch",
+        })
+        vim.api.nvim_win_set_cursor(0, { 1, 0 })
+
+        headhunter.take_head()
+
+        local items = vim.fn.getqflist()
+        assert.are.equal(0, #items)
+
+        vim.api.nvim_buf_delete(bufnr, { force = true })
     end)
 end)
