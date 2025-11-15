@@ -30,8 +30,11 @@ end
 
 local defaultConfig = {
     enabled = true,
+    auto_save = false,
     keys = vim.deepcopy(default_keys),
 }
+
+local config = vim.deepcopy(defaultConfig)
 
 -- Parses git grep output (testable, can be called by tests)
 function M._parse_conflicts(output)
@@ -294,10 +297,11 @@ function M._register_keymaps(config)
     map(keys.quickfix, M.populate_quickfix, "List Git conflicts")
 end
 
-local config = vim.deepcopy(defaultConfig)
-
 function M.setup(user_config)
     local opts = vim.deepcopy(user_config or {})
+    if opts.auto_save ~= nil and type(opts.auto_save) ~= "boolean" then
+        error("headhunter.nvim: `auto_save` must be a boolean or nil")
+    end
     if opts.keys ~= nil and opts.keys ~= false then
         if type(opts.keys) ~= "table" then
             error("headhunter.nvim: `keys` must be a table, false, or nil")
