@@ -260,6 +260,12 @@ local function apply_resolution(mode)
         replacement
     )
 
+    if config.auto_save then
+        vim.api.nvim_buf_call(bufnr, function()
+            vim.cmd("silent write")
+        end)
+    end
+
     refresh_conflicts({ after_resolution = true })
 end
 
